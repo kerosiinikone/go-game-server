@@ -14,6 +14,13 @@ import (
 
 type RoomCollection map[string]*Room
 
+type RoomHandler struct {
+	latestRoomId int16
+	Inch chan ServerMessage
+	rooms RoomCollection
+	cfg *Config
+}
+
 const (
 	defaultReadBufferSize = 1024
 	defaultWriteBufferSize = 1024
@@ -25,7 +32,7 @@ var upgrader = websocket.Upgrader{
 }
 
 // Wrap for errors?
-func ServeWebSocket(w http.ResponseWriter, r *http.Request) {
+func (rh *RoomHandler) ServeWebSocket(w http.ResponseWriter, r *http.Request) {
     conn, err := upgrader.Upgrade(w, r, nil)
     if err != nil {
         // Logger
@@ -33,41 +40,81 @@ func ServeWebSocket(w http.ResponseWriter, r *http.Request) {
     }
 
 	// Assign the request to a new player
-	// Connect the player to a available room -> if no available rooms, spawn a new one 
+	newPlayer := NewPlayer(conn)
+
+	// Connect the player to an available room -> if no available rooms, spawn a new one
+	rh.resolveRoomConnection(newPlayer)
 	
 	for {
 		// Convert to a new message type in proto
 		_, p, err := conn.ReadMessage()
 		
 		if err != nil {
-			// Logger
+			// Signal the room that the player disconnected -> clear everything
 			return
 		}
 		_ = p
 	}
 }
 
-func resolveRoomConnection(p *Player) {
-	// Find empty rooms
-	// If none -> create a new one
+func (rh *RoomHandler) acceptLoop() {
+	for {
+		select {
+		case msg := <-rh.Inch:
+			_ = msg
+		}
+	}
+}
+
+func (rh *RoomHandler) resolveRoomConnection(p *Player) {
+	for _, v := range rh.rooms {
+		if v.Player1 == nil {
+			v.Player1 = p
+			v.Inch <- ServerMessage{
+				typ: MessagePlayerJoined,
+			}
+			return
+		}
+		if v.Player2 == nil {
+			v.Player2 = p
+			v.Inch <- ServerMessage{
+				typ: MessagePlayerJoined,
+			}
+			return
+		}
+	}
+
+	// Simplify
+	newId := rh.latestRoomId+1
+	rh.rooms[fmt.Sprintf("%d", newId)] = NewRoom(newId, rh.cfg)
+	r := rh.rooms[fmt.Sprintf("%d", newId)]
+	r.Player1 = p
+	p.outch = r.Inch
+	rh.latestRoomId = newId
+	
+	go r.Start()
+	
+	// Message wrapper func -> enough time for the server to start accepting comms?
+	r.Inch <- ServerMessage{
+		typ: MessagePlayerJoined,
+	}
+
 }
 
 func main() {
 	var (
 		addr = flag.String("addr", ":3000", "game server address")
-		rooms RoomCollection = make(RoomCollection)
 	)
 	flag.Parse()
 	cfg := NewConfig(*addr)
 
-	// Always create one room at the start
-	firstRoom := NewRoom(1, cfg)
-	rooms[fmt.Sprintf("%d", firstRoom.Id)] = firstRoom
-
-	go firstRoom.Start()
-
+	rh := &RoomHandler{
+		rooms: make(RoomCollection),
+		Inch: make(chan ServerMessage),
+		cfg: cfg,
+	}
 	// For every individual connection player
-	http.HandleFunc("/", ServeWebSocket)
+	http.HandleFunc("/", rh.ServeWebSocket)
 
 	http.ListenAndServe(cfg.Addr, nil)
 }
