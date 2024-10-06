@@ -76,6 +76,8 @@ func (r *RoomWaitingForPlayers) acceptLoop() {
 					}
 				}
 
+				// Inform the client
+
 				// A better way to achieve this?
 				r.r.setState(&RoomGameStarted{
 					r: r.r,

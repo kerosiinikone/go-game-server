@@ -16,8 +16,10 @@ type RoomCollection map[string]*Room
 
 type RoomHandler struct {
 	latestRoomId int16
-	Inch chan ServerMessage
 	rooms RoomCollection
+
+	Inch chan ServerMessage
+
 	cfg *Config
 }
 
@@ -44,19 +46,9 @@ func (rh *RoomHandler) ServeWebSocket(w http.ResponseWriter, r *http.Request) {
 
 	// Connect the player to an available room -> if no available rooms, spawn a new one
 	rh.resolveRoomConnection(newPlayer)
-	
-	for {
-		// Convert to a new message type in proto
-		_, p, err := conn.ReadMessage()
-		
-		if err != nil {
-			// Signal the room that the player disconnected -> clear everything
-			return
-		}
-		_ = p
-	}
 }
 
+// Destroying unused rooms
 func (rh *RoomHandler) acceptLoop() {
 	for {
 		select {
@@ -70,6 +62,8 @@ func (rh *RoomHandler) resolveRoomConnection(p *Player) {
 	for _, v := range rh.rooms {
 		if v.Player1 == nil {
 			v.Player1 = p
+			p.outch = v.Inch
+			p.rId = v.Id
 			v.Inch <- ServerMessage{
 				typ: MessagePlayerJoined,
 			}
@@ -77,6 +71,8 @@ func (rh *RoomHandler) resolveRoomConnection(p *Player) {
 		}
 		if v.Player2 == nil {
 			v.Player2 = p
+			p.outch = v.Inch
+			p.rId = v.Id
 			v.Inch <- ServerMessage{
 				typ: MessagePlayerJoined,
 			}
@@ -86,10 +82,14 @@ func (rh *RoomHandler) resolveRoomConnection(p *Player) {
 
 	// Simplify
 	newId := rh.latestRoomId+1
-	rh.rooms[fmt.Sprintf("%d", newId)] = NewRoom(newId, rh.cfg)
-	r := rh.rooms[fmt.Sprintf("%d", newId)]
+	sId := fmt.Sprintf("%d", newId)
+
+	rh.rooms[sId] = NewRoom(newId, rh.cfg)
+	r := rh.rooms[sId]
+
 	r.Player1 = p
 	p.outch = r.Inch
+	p.rId = r.Id
 	rh.latestRoomId = newId
 	
 	go r.Start()
