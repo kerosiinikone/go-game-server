@@ -5,7 +5,6 @@ import (
 	"sync"
 )
 
-// Own functions, own loops for different situations
 type RoomState interface {
 	acceptLoop()
 }
@@ -18,8 +17,7 @@ type Room struct {
 	Player1 *Player
 	Player2 *Player
 	
-	// For incoming messages
-	Inch chan ServerMessage
+	Inch chan ServerMsg
 	
 	cfg *Config
 	mu sync.Mutex
@@ -29,15 +27,11 @@ type RoomWaitingForPlayers struct {
     r *Room 
 }
 
-type RoomGameStarted struct {
-	r *Room
-}
-
 func NewRoom(id int16, cfg *Config) *Room {
 	r := &Room{
 		Id: id,
 		cfg: cfg,
-		Inch: make(chan ServerMessage),
+		Inch: make(chan ServerMsg),
 		mu: sync.Mutex{},
 	}
 	r.State = &RoomWaitingForPlayers{
@@ -57,6 +51,7 @@ func (r *Room) setState(state RoomState) {
 	r.State = state
 }
 
+
 // Wait for players to connect
 func (r *RoomWaitingForPlayers) acceptLoop() {
 	for {
@@ -68,18 +63,16 @@ func (r *RoomWaitingForPlayers) acceptLoop() {
 
 				if r.r.Player1 != nil && r.r.Player2 != nil {
 					// Start the game
-					r.r.Player1.Inch <- ServerMessage{
+					r.r.Player1.Inch <- ServerMsg{
 						typ: MessageGameStarted,
 					}
-					r.r.Player2.Inch <- ServerMessage{
+					r.r.Player2.Inch <- ServerMsg{
 						typ: MessageGameStarted,
 					}
 				}
 
-				// Inform the client
-
 				// A better way to achieve this?
-				r.r.setState(&RoomGameStarted{
+				r.r.setState(&Player1Turn{
 					r: r.r,
 				})
 
@@ -93,11 +86,23 @@ func (r *RoomWaitingForPlayers) acceptLoop() {
 	}
 }
 
-func (r *RoomGameStarted) acceptLoop() {
+// A few considerations:
+// A queue for all the incoming requests -> not needed since
+// only one player goes at a time with one input
+func (r *Player1Turn) acceptLoop() {
 	for {
 		select {
 		case msg := <- r.r.Inch:
-			switch msg.typ {}
+			switch msg.typ {
+			case MessagePlayer1Turn:
+				// Handle
+			case MessagePlayer2Turn:
+				// Put on a queue?
+				// or illegal
+			case MessagePlayerJoined:
+				panic("Illegal")
+			}
+
 		}
 	}
 }

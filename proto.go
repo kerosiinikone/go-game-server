@@ -6,14 +6,14 @@ const (
 	MessageRoomClosed = iota
 	MessagePlayerJoined
 	MessageGameStarted
-	// ...
+	MessageRoomDestroyed
+	MessagePlayer1Turn
+	MessagePlayer2Turn
 )
 
-// Channel comms
-type ServerMessage struct {
+type ServerMsg struct {
 	typ int
-	// ...
+	roomId int16
 }
 
-// JSON
-type WSMessage struct{}
+type WSMsg struct{}

@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"net/http"
+	"sync"
 
 	"github.com/gorilla/websocket"
 )
@@ -18,7 +19,9 @@ type RoomHandler struct {
 	latestRoomId int16
 	rooms RoomCollection
 
-	Inch chan ServerMessage
+	mu sync.Mutex
+
+	Inch chan ServerMsg
 
 	cfg *Config
 }
@@ -53,18 +56,24 @@ func (rh *RoomHandler) acceptLoop() {
 	for {
 		select {
 		case msg := <-rh.Inch:
-			_ = msg
+			switch msg.typ {
+			case MessageRoomDestroyed:
+				// Cleanup
+				delete(rh.rooms, fmt.Sprintf("%d", msg.roomId))
+			}
 		}
 	}
 }
 
 func (rh *RoomHandler) resolveRoomConnection(p *Player) {
+	// Lock resource?
 	for _, v := range rh.rooms {
 		if v.Player1 == nil {
 			v.Player1 = p
 			p.outch = v.Inch
+			p.Player1 = true
 			p.rId = v.Id
-			v.Inch <- ServerMessage{
+			v.Inch <- ServerMsg{
 				typ: MessagePlayerJoined,
 			}
 			return
@@ -73,7 +82,7 @@ func (rh *RoomHandler) resolveRoomConnection(p *Player) {
 			v.Player2 = p
 			p.outch = v.Inch
 			p.rId = v.Id
-			v.Inch <- ServerMessage{
+			v.Inch <- ServerMsg{
 				typ: MessagePlayerJoined,
 			}
 			return
@@ -89,13 +98,14 @@ func (rh *RoomHandler) resolveRoomConnection(p *Player) {
 
 	r.Player1 = p
 	p.outch = r.Inch
+	p.Player1 = true
 	p.rId = r.Id
 	rh.latestRoomId = newId
 	
 	go r.Start()
 	
 	// Message wrapper func -> enough time for the server to start accepting comms?
-	r.Inch <- ServerMessage{
+	r.Inch <- ServerMsg{
 		typ: MessagePlayerJoined,
 	}
 
@@ -110,7 +120,7 @@ func main() {
 
 	rh := &RoomHandler{
 		rooms: make(RoomCollection),
-		Inch: make(chan ServerMessage),
+		Inch: make(chan ServerMsg),
 		cfg: cfg,
 	}
 	// For every individual connection player

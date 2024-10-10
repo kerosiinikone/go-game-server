@@ -5,15 +5,16 @@ import "github.com/gorilla/websocket"
 type Player struct {
 	rId 	int16
 	conn  	*websocket.Conn
+	Player1 bool
 	
-	Inch  	chan ServerMessage
-	outch 	chan ServerMessage
+	Inch  	chan ServerMsg
+	outch 	chan ServerMsg
 }
 
 func NewPlayer(conn *websocket.Conn) *Player {
 	p := &Player{
 		conn: conn,
-		Inch: make(chan ServerMessage),
+		Inch: make(chan ServerMsg),
 	}
 	go p.listenForClient()
 
@@ -24,6 +25,12 @@ func NewPlayer(conn *websocket.Conn) *Player {
 func (p *Player) listenForClient() {
 	for {
 		_, p, err := p.conn.ReadMessage()
+		// p is the message from the client
+
+		// If the client disconnects, remove them from the room
+		// If the client sends a leave message, remove them from the room
+		// If the client sends a turn message, send it to the room
+
 		_ = p
 		if err != nil {
 			// Cleanup
@@ -39,7 +46,11 @@ func (p *Player) acceptLoop() {
 	for {
 		select {
 		case msg := <- p.Inch:
-			_ = msg
+			switch msg.typ {
+			case MessageGameStarted:
+				// Use a helper to send a response to client (GameStarted)
+				// Wait for client to acknowledge
+			}
 		}
 	}
 }
