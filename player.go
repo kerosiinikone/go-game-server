@@ -3,6 +3,7 @@ package main
 import "github.com/gorilla/websocket"
 
 type Player struct {
+	Id   	int16
 	rId 	int16
 	conn  	*websocket.Conn
 	Player1 bool

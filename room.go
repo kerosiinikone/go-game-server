@@ -2,11 +2,13 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"sync"
 )
 
 type RoomState interface {
 	acceptLoop()
+	name() string
 }
 
 type Room struct {
@@ -41,11 +43,12 @@ func NewRoom(id int16, cfg *Config) *Room {
 }
 
 func (r *Room) Start() {
-	// Init stuff and start accepting messages
+	log.Printf("State %s activated in room %d\n", r.State.name(), r.Id)
 	r.State.acceptLoop()
 }
 
 func (r *Room) setState(state RoomState) {
+	log.Printf("Room %d state changed to %T\n", r.Id, state)
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.State = state
@@ -59,31 +62,30 @@ func (r *RoomWaitingForPlayers) acceptLoop() {
 		case msg := <- r.r.Inch:
 			switch msg.typ {
 			case MessagePlayerJoined:
-				fmt.Printf("New player joined to %d", r.r.Id)
-
+				fmt.Printf("New player %d joined to %d\n", msg.playerId, r.r.Id)
 				if r.r.Player1 != nil && r.r.Player2 != nil {
-					// Start the game
+					r.r.setState(&Player1Turn{
+						r: r.r,
+					})
+
+					go r.r.Start()
+
 					r.r.Player1.Inch <- ServerMsg{
 						typ: MessageGameStarted,
 					}
 					r.r.Player2.Inch <- ServerMsg{
 						typ: MessageGameStarted,
 					}
+					
+					return
 				}
-
-				// A better way to achieve this?
-				r.r.setState(&Player1Turn{
-					r: r.r,
-				})
-
-				defer func ()  {
-					go r.r.Start()
-				}()
-
-				return
 			}
 		}
 	}
+}
+
+func (r *RoomWaitingForPlayers) name() string {
+	return "RoomWaitingForPlayers"
 }
 
 // A few considerations:
@@ -105,4 +107,8 @@ func (r *Player1Turn) acceptLoop() {
 
 		}
 	}
+}
+
+func (r *Player1Turn) name() string {
+	return "Player1Turn"
 }

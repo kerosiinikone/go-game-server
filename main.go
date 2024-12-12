@@ -70,20 +70,24 @@ func (rh *RoomHandler) resolveRoomConnection(p *Player) {
 	for _, v := range rh.rooms {
 		if v.Player1 == nil {
 			v.Player1 = p
+			p.Id = 1
 			p.outch = v.Inch
 			p.Player1 = true
 			p.rId = v.Id
 			v.Inch <- ServerMsg{
 				typ: MessagePlayerJoined,
+				playerId: p.Id,
 			}
 			return
 		}
 		if v.Player2 == nil {
 			v.Player2 = p
+			p.Id = 2
 			p.outch = v.Inch
 			p.rId = v.Id
 			v.Inch <- ServerMsg{
 				typ: MessagePlayerJoined,
+				playerId: p.Id,
 			}
 			return
 		}
@@ -98,6 +102,7 @@ func (rh *RoomHandler) resolveRoomConnection(p *Player) {
 
 	r.Player1 = p
 	p.outch = r.Inch
+	p.Id = 1
 	p.Player1 = true
 	p.rId = r.Id
 	rh.latestRoomId = newId
@@ -107,6 +112,7 @@ func (rh *RoomHandler) resolveRoomConnection(p *Player) {
 	// Message wrapper func -> enough time for the server to start accepting comms?
 	r.Inch <- ServerMsg{
 		typ: MessagePlayerJoined,
+		playerId: p.Id,
 	}
 
 }

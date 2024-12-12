@@ -14,6 +14,7 @@ const (
 type ServerMsg struct {
 	typ int
 	roomId int16
+	playerId int16
 }
 
 type WSMsg struct{}
