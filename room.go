@@ -8,7 +8,7 @@ import (
 
 type RoomState interface {
 	acceptLoop()
-	name() string
+	Name() string
 }
 
 type Room struct {
@@ -43,7 +43,7 @@ func NewRoom(id int16, cfg *Config) *Room {
 }
 
 func (r *Room) Start() {
-	log.Printf("State %s activated in room %d\n", r.State.name(), r.Id)
+	log.Printf("State %s activated in room %d\n", r.State.Name(), r.Id)
 	r.State.acceptLoop()
 }
 
@@ -71,12 +71,12 @@ func (r *RoomWaitingForPlayers) acceptLoop() {
 					go r.r.Start()
 
 					r.r.Player1.Inch <- ServerMsg{
-						typ: MessageGameStarted,
+						typ: MessagePlayer1Turn,
 					}
 					r.r.Player2.Inch <- ServerMsg{
-						typ: MessageGameStarted,
-					}
-					
+						typ: MessagePlayer1Turn,
+					}	
+
 					return
 				}
 			}
@@ -84,7 +84,7 @@ func (r *RoomWaitingForPlayers) acceptLoop() {
 	}
 }
 
-func (r *RoomWaitingForPlayers) name() string {
+func (r *RoomWaitingForPlayers) Name() string {
 	return "RoomWaitingForPlayers"
 }
 
@@ -96,11 +96,28 @@ func (r *Player1Turn) acceptLoop() {
 		select {
 		case msg := <- r.r.Inch:
 			switch msg.typ {
-			case MessagePlayer1Turn:
-				// Handle
-			case MessagePlayer2Turn:
+			case MessagePlayer1Played:
+				// Update state
+				// Notify player2
+				r.r.setState(&Player2Turn{
+					r: r.r,
+				})
+				
+				go r.r.Start()
+
+				r.r.Player1.Inch <- ServerMsg{
+					typ: MessagePlayer2Turn,
+				}
+				r.r.Player2.Inch <- ServerMsg{
+					typ: MessagePlayer2Turn,
+				}	
+
+				return
+			case MessagePlayer2Played:
 				// Put on a queue?
 				// or illegal
+			case MessagePlayer2Turn:
+				// Illegal
 			case MessagePlayerJoined:
 				panic("Illegal")
 			}
@@ -109,6 +126,44 @@ func (r *Player1Turn) acceptLoop() {
 	}
 }
 
-func (r *Player1Turn) name() string {
+func (r *Player1Turn) Name() string {
 	return "Player1Turn"
+}
+
+func (r *Player2Turn) acceptLoop() {
+	for {
+		select {
+		case msg := <- r.r.Inch:
+			switch msg.typ {
+			case MessagePlayer2Played:
+				// Update state
+				// Notify players
+				r.r.setState(&Player1Turn{
+					r: r.r,
+				})
+
+				go r.r.Start()
+
+				r.r.Player1.Inch <- ServerMsg{
+					typ: MessagePlayer1Turn,
+				}
+				r.r.Player2.Inch <- ServerMsg{
+					typ: MessagePlayer1Turn,
+				}
+
+				return
+			case MessagePlayer1Played:
+				// Put on a queue?
+				// or illegal
+			case MessagePlayer1Turn:
+				// Illegal
+			case MessagePlayerJoined:
+				panic("Illegal")
+			}
+		}
+	}
+}
+
+func (r *Player2Turn) Name() string {
+	return "Player2Turn"
 }

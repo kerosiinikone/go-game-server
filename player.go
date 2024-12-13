@@ -1,6 +1,11 @@
 package main
 
-import "github.com/gorilla/websocket"
+import (
+	"encoding/json"
+	"log"
+
+	"github.com/gorilla/websocket"
+)
 
 type Player struct {
 	Id   	int16
@@ -18,6 +23,7 @@ func NewPlayer(conn *websocket.Conn) *Player {
 		Inch: make(chan ServerMsg),
 	}
 	go p.listenForClient()
+	go p.acceptLoop()
 
 	return p
 }
@@ -25,18 +31,32 @@ func NewPlayer(conn *websocket.Conn) *Player {
 // Two types of messages from client -> turnCmd and leaveCmd 
 func (p *Player) listenForClient() {
 	for {
-		_, p, err := p.conn.ReadMessage()
-		// p is the message from the client
-
+		var msg WSMsg
+		_, bytes, err := p.conn.ReadMessage()
+		if err != nil {
+			return
+		}
+		if err := json.Unmarshal(bytes, &msg); err != nil {
+			log.Printf("Error unmarshalling message: %v\n", err)
+		}
+		// Also check for state of the room
+		switch msg.Typ {
+		case MessagePlayer1Played:
+			log.Printf("Player %d played\n", p.Id)
+			p.outch <- ServerMsg{
+				typ: MessagePlayer1Played,
+				playerId: p.Id,
+			}
+		case MessagePlayer2Played:
+			log.Printf("Player %d played\n", p.Id)
+			p.outch <- ServerMsg{
+				typ: MessagePlayer2Played,
+				playerId: p.Id,
+			}
+		}
 		// If the client disconnects, remove them from the room
 		// If the client sends a leave message, remove them from the room
 		// If the client sends a turn message, send it to the room
-
-		_ = p
-		if err != nil {
-			// Cleanup
-			return
-		}
 	}
 }
 
@@ -48,9 +68,48 @@ func (p *Player) acceptLoop() {
 		select {
 		case msg := <- p.Inch:
 			switch msg.typ {
-			case MessageGameStarted:
-				// Use a helper to send a response to client (GameStarted)
-				// Wait for client to acknowledge
+			case MessagePlayer1Turn:
+				var (
+					bytes []byte
+					clientMsg WSMsg
+				)
+				if p.Player1 {
+					clientMsg = WSMsg{
+						Typ: MessagePlayer1Turn,
+						PlayerId: p.Id,
+					}
+				} else {
+					clientMsg = WSMsg{
+						Typ: MessagePlayer1Turn,
+						PlayerId: p.Id,
+					}
+				}
+				bytes, err := json.Marshal(&clientMsg)
+				if err != nil {
+					log.Printf("Error unmarshalling message: %v\n", err)
+				}
+				p.conn.WriteMessage(websocket.TextMessage, bytes)
+			case MessagePlayer2Turn:
+				var (
+					bytes []byte
+					clientMsg WSMsg
+				)
+				if !p.Player1 {
+					clientMsg = WSMsg{
+						Typ: MessagePlayer2Turn,
+						PlayerId: p.Id,
+					}
+				} else {
+					clientMsg = WSMsg{
+						Typ: MessagePlayer2Turn,
+						PlayerId: p.Id,
+					}
+				}
+				bytes, err := json.Marshal(&clientMsg)
+				if err != nil {
+					log.Printf("Error unmarshalling message: %v\n", err)
+				}
+				p.conn.WriteMessage(websocket.TextMessage, bytes)
 			}
 		}
 	}

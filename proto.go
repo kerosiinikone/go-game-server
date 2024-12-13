@@ -4,11 +4,14 @@ package main
 
 const (
 	MessageRoomClosed = iota
+	MessageHandshake
 	MessagePlayerJoined
 	MessageGameStarted
 	MessageRoomDestroyed
 	MessagePlayer1Turn
 	MessagePlayer2Turn
+	MessagePlayer1Played
+	MessagePlayer2Played
 )
 
 type ServerMsg struct {
@@ -17,4 +20,8 @@ type ServerMsg struct {
 	playerId int16
 }
 
-type WSMsg struct{}
+type WSMsg struct {
+	Typ int
+	PlayerId int16
+	Data []byte
+}

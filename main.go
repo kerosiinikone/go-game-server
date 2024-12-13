@@ -1,8 +1,10 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
+	"log"
 	"net/http"
 	"sync"
 
@@ -29,11 +31,16 @@ type RoomHandler struct {
 const (
 	defaultReadBufferSize = 1024
 	defaultWriteBufferSize = 1024
+	defaultClientAddr = "http://localhost:5173"
 )
 
 var upgrader = websocket.Upgrader{
     ReadBufferSize:  defaultReadBufferSize,
     WriteBufferSize: defaultWriteBufferSize,
+	CheckOrigin: func(r *http.Request) bool {
+		origin := r.Header.Get("Origin")
+		return origin == defaultClientAddr
+	},
 }
 
 // Wrap for errors?
@@ -49,6 +56,16 @@ func (rh *RoomHandler) ServeWebSocket(w http.ResponseWriter, r *http.Request) {
 
 	// Connect the player to an available room -> if no available rooms, spawn a new one
 	rh.resolveRoomConnection(newPlayer)
+
+	// Send a handshake message to the client
+	bytes, err := json.Marshal(&WSMsg{
+		Typ: MessageHandshake,
+		PlayerId: newPlayer.Id,
+	})
+	if err != nil {
+		log.Printf("Error unmarshalling message: %v\n", err)
+	}
+	newPlayer.conn.WriteMessage(websocket.TextMessage, bytes)
 }
 
 // Destroying unused rooms
@@ -129,8 +146,7 @@ func main() {
 		Inch: make(chan ServerMsg),
 		cfg: cfg,
 	}
-	// For every individual connection player
-	http.HandleFunc("/", rh.ServeWebSocket)
 
+	http.HandleFunc("/", rh.ServeWebSocket)
 	http.ListenAndServe(cfg.Addr, nil)
 }
