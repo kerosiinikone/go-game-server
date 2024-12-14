@@ -73,10 +73,10 @@ func (rh *RoomHandler) acceptLoop() {
 	for {
 		select {
 		case msg := <-rh.Inch:
-			switch msg.typ {
+			switch msg.Typ {
 			case MessageRoomDestroyed:
 				// Cleanup
-				delete(rh.rooms, fmt.Sprintf("%d", msg.roomId))
+				delete(rh.rooms, fmt.Sprintf("%d", msg.RoomId))
 			}
 		}
 	}
@@ -92,8 +92,8 @@ func (rh *RoomHandler) resolveRoomConnection(p *Player) {
 			p.Player1 = true
 			p.rId = v.Id
 			v.Inch <- ServerMsg{
-				typ: MessagePlayerJoined,
-				playerId: p.Id,
+				Typ: MessagePlayerJoined,
+				PlayerId: p.Id,
 			}
 			return
 		}
@@ -103,8 +103,8 @@ func (rh *RoomHandler) resolveRoomConnection(p *Player) {
 			p.outch = v.Inch
 			p.rId = v.Id
 			v.Inch <- ServerMsg{
-				typ: MessagePlayerJoined,
-				playerId: p.Id,
+				Typ: MessagePlayerJoined,
+				PlayerId: p.Id,
 			}
 			return
 		}
@@ -126,10 +126,9 @@ func (rh *RoomHandler) resolveRoomConnection(p *Player) {
 	
 	go r.Start()
 	
-	// Message wrapper func -> enough time for the server to start accepting comms?
 	r.Inch <- ServerMsg{
-		typ: MessagePlayerJoined,
-		playerId: p.Id,
+		Typ: MessagePlayerJoined,
+		PlayerId: p.Id,
 	}
 
 }

@@ -15,13 +15,16 @@ const (
 )
 
 type ServerMsg struct {
-	typ int
-	roomId int16
-	playerId int16
+	Typ 		int
+	RoomId 		int16
+	PlayerId 	int16
+	Card 		Card
+	ScoreCards	[]Card
 }
 
 type WSMsg struct {
-	Typ int
-	PlayerId int16
-	Data []byte
+	Typ 		int
+	PlayerId 	int16
+	Card 		Card
+	ScoreCards	[]Card
 }

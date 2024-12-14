@@ -44,14 +44,14 @@ func (p *Player) listenForClient() {
 		case MessagePlayer1Played:
 			log.Printf("Player %d played\n", p.Id)
 			p.outch <- ServerMsg{
-				typ: MessagePlayer1Played,
-				playerId: p.Id,
+				Typ: MessagePlayer1Played,
+				PlayerId: p.Id,
 			}
 		case MessagePlayer2Played:
 			log.Printf("Player %d played\n", p.Id)
 			p.outch <- ServerMsg{
-				typ: MessagePlayer2Played,
-				playerId: p.Id,
+				Typ: MessagePlayer2Played,
+				PlayerId: p.Id,
 			}
 		}
 		// If the client disconnects, remove them from the room
@@ -67,7 +67,7 @@ func (p *Player) acceptLoop() {
 	for {
 		select {
 		case msg := <- p.Inch:
-			switch msg.typ {
+			switch msg.Typ {
 			case MessagePlayer1Turn:
 				var (
 					bytes []byte
@@ -77,11 +77,14 @@ func (p *Player) acceptLoop() {
 					clientMsg = WSMsg{
 						Typ: MessagePlayer1Turn,
 						PlayerId: p.Id,
+						Card: msg.Card,
+						ScoreCards: msg.ScoreCards,
 					}
 				} else {
 					clientMsg = WSMsg{
 						Typ: MessagePlayer1Turn,
 						PlayerId: p.Id,
+						ScoreCards: msg.ScoreCards,
 					}
 				}
 				bytes, err := json.Marshal(&clientMsg)
@@ -98,6 +101,7 @@ func (p *Player) acceptLoop() {
 					clientMsg = WSMsg{
 						Typ: MessagePlayer2Turn,
 						PlayerId: p.Id,
+						Card: msg.Card,
 					}
 				} else {
 					clientMsg = WSMsg{
