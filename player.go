@@ -68,6 +68,16 @@ func (p *Player) acceptLoop() {
 		select {
 		case msg := <- p.Inch:
 			switch msg.Typ {
+			case MessagePlayerJoined:
+				clientMsg := WSMsg{
+					Typ: MessagePlayerJoined,
+					PlayerId: msg.PlayerId,
+				}
+				bytes, err := json.Marshal(&clientMsg)
+				if err != nil {
+					log.Printf("Error unmarshalling message: %v\n", err)
+				}
+				p.conn.WriteMessage(websocket.TextMessage, bytes)
 			case MessagePlayer1Turn:
 				var (
 					bytes []byte

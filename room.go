@@ -12,9 +12,14 @@ type RoomState interface {
 	Name() string
 }
 
+type RoomWaitingForPlayers struct {
+	r *Room 
+}
+
 type Room struct {
 	Id int16 
 	
+	// Room state
 	State RoomState
 
 	// Game state
@@ -31,10 +36,6 @@ type Room struct {
 	
 	cfg *Config
 	mu sync.Mutex
-}
-
-type RoomWaitingForPlayers struct {
-    r *Room 
 }
 
 func NewRoom(id int16, cfg *Config) *Room {
@@ -73,6 +74,15 @@ func (r *RoomWaitingForPlayers) acceptLoop() {
 			switch msg.Typ {
 			case MessagePlayerJoined:
 				fmt.Printf("New player %d joined to %d\n", msg.PlayerId, r.r.Id)
+
+				if r.r.Player1 != nil && msg.PlayerId == 2 {
+					log.Printf("Player 2 joined room %d\n", r.r.Id)
+					r.r.Player1.Inch <- ServerMsg{
+						Typ: MessagePlayerJoined,
+						PlayerId: msg.PlayerId,
+					}
+				}
+
 				if r.r.Player1 != nil && r.r.Player2 != nil {
 					r.r.setState(&Player1Turn{
 						r: r.r,
@@ -129,7 +139,6 @@ func (r *Player1Turn) acceptLoop() {
 					Typ: MessagePlayer2Turn,
 					Card: rc,
 				}
-				
 				return
 			case MessagePlayer2Played:
 				// Put on a queue?
@@ -139,7 +148,6 @@ func (r *Player1Turn) acceptLoop() {
 			case MessagePlayerJoined:
 				panic("Illegal")
 			}
-
 		}
 	}
 }

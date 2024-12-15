@@ -71,9 +71,6 @@ var deck = []Card{
 }
 
 func (r *Room) RandomCard() Card {
-	if len(r.Deck) == 0 {
-		r.Deck = deck
-	}
 	randIndex := rand.Intn(len(r.Deck))
 	c := r.Deck[randIndex]
 	r.Deck = append(r.Deck[:randIndex], r.Deck[randIndex+1:]...)
