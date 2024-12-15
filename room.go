@@ -90,12 +90,8 @@ func (r *RoomWaitingForPlayers) acceptLoop() {
 
 					go r.r.Start()
 
-					rc := r.r.RandomCard()
-					r.r.Player1Drawn = append(r.r.Player1Drawn, rc)
-
 					r.r.Player1.Inch <- ServerMsg{
 						Typ: MessagePlayer1Turn,
-						Card: rc,
 					}
 					r.r.Player2.Inch <- ServerMsg{
 						Typ: MessagePlayer1Turn,
@@ -123,6 +119,7 @@ func (r *Player1Turn) acceptLoop() {
 			case MessagePlayer1Played:
 				// Update state
 				// Notify player2
+
 				r.r.setState(&Player2Turn{
 					r: r.r,
 				})
@@ -130,10 +127,11 @@ func (r *Player1Turn) acceptLoop() {
 				go r.r.Start()
 
 				rc := r.r.RandomCard()
-				r.r.Player2Drawn = append(r.r.Player2Drawn, rc)
+				r.r.Player1Drawn = append(r.r.Player1Drawn, rc)
 
 				r.r.Player1.Inch <- ServerMsg{
 					Typ: MessagePlayer2Turn,
+					Card: rc,
 				}
 				r.r.Player2.Inch <- ServerMsg{
 					Typ: MessagePlayer2Turn,
@@ -171,6 +169,7 @@ func (r *Player2Turn) acceptLoop() {
 				go r.r.Start()
 
 				rc := r.r.RandomCard()
+				r.r.Player2Drawn = append(r.r.Player2Drawn, rc)
 
 				if len(r.r.Player1Drawn) == len(r.r.Player2Drawn) {
 					// Check for winner
@@ -194,11 +193,12 @@ func (r *Player2Turn) acceptLoop() {
 
 						r.r.Player1.Inch <- ServerMsg{
 							Typ: MessagePlayer1Turn,
+							Won: true,
 							Card: rc,
-							ScoreCards: won,
 						}
 						r.r.Player2.Inch <- ServerMsg{
 							Typ: MessagePlayer1Turn,
+							Card: rc,
 						}	
 
 					} else if p1Score < p2Score {
@@ -212,21 +212,21 @@ func (r *Player2Turn) acceptLoop() {
 						}
 						r.r.Player2.Inch <- ServerMsg{
 							Typ: MessagePlayer1Turn,
-							ScoreCards: won,
+							Won: true,
+							Card: rc,
 						}	
 					} else {
-						// Draw -> this is where a war happens
+						// Draw -> this is where the war occurs
 						r.r.Player1.Inch <- ServerMsg{
 							Typ: MessagePlayer1Turn,
 							Card: rc,
 						}
 						r.r.Player2.Inch <- ServerMsg{
 							Typ: MessagePlayer1Turn,
+							Card: rc,
 						}	
 					}
 				}
-
-				r.r.Player1Drawn = append(r.r.Player1Drawn, rc)
 
 				return
 			case MessagePlayer1Played:

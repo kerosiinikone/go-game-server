@@ -81,21 +81,12 @@ func (p *Player) acceptLoop() {
 			case MessagePlayer1Turn:
 				var (
 					bytes []byte
-					clientMsg WSMsg
 				)
-				if p.Player1 {
-					clientMsg = WSMsg{
-						Typ: MessagePlayer1Turn,
-						PlayerId: p.Id,
-						Card: msg.Card,
-						ScoreCards: msg.ScoreCards,
-					}
-				} else {
-					clientMsg = WSMsg{
-						Typ: MessagePlayer1Turn,
-						PlayerId: p.Id,
-						ScoreCards: msg.ScoreCards,
-					}
+				clientMsg := WSMsg{
+					Typ: MessagePlayer1Turn,
+					PlayerId: p.Id,
+					Card: msg.Card,
+					Won: msg.Won,
 				}
 				bytes, err := json.Marshal(&clientMsg)
 				if err != nil {
@@ -105,19 +96,11 @@ func (p *Player) acceptLoop() {
 			case MessagePlayer2Turn:
 				var (
 					bytes []byte
-					clientMsg WSMsg
 				)
-				if !p.Player1 {
-					clientMsg = WSMsg{
-						Typ: MessagePlayer2Turn,
-						PlayerId: p.Id,
-						Card: msg.Card,
-					}
-				} else {
-					clientMsg = WSMsg{
-						Typ: MessagePlayer2Turn,
-						PlayerId: p.Id,
-					}
+				clientMsg := WSMsg{
+					Typ: MessagePlayer2Turn,
+					PlayerId: p.Id,
+					Card: msg.Card,
 				}
 				bytes, err := json.Marshal(&clientMsg)
 				if err != nil {

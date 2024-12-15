@@ -19,12 +19,12 @@ type ServerMsg struct {
 	RoomId 		int16
 	PlayerId 	int16
 	Card 		Card
-	ScoreCards	[]Card
+	Won			bool
 }
 
 type WSMsg struct {
 	Typ 		int
 	PlayerId 	int16
 	Card 		Card
-	ScoreCards	[]Card
+	Won			bool
 }
