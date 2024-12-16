@@ -86,6 +86,7 @@ func (p *Player) acceptLoop() {
 					Typ: MessagePlayer1Turn,
 					PlayerId: p.Id,
 					Card: msg.Card,
+					War: msg.War,
 					Won: msg.Won,
 				}
 				bytes, err := json.Marshal(&clientMsg)
@@ -100,6 +101,7 @@ func (p *Player) acceptLoop() {
 				clientMsg := WSMsg{
 					Typ: MessagePlayer2Turn,
 					PlayerId: p.Id,
+					War: msg.War,
 					Card: msg.Card,
 				}
 				bytes, err := json.Marshal(&clientMsg)

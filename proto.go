@@ -22,6 +22,7 @@ type ServerMsg struct {
 	Card 		Card
 	Won			bool
 	Winner 		int16
+	War 		bool
 }
 
 type WSMsg struct {
@@ -30,4 +31,5 @@ type WSMsg struct {
 	Card 		Card
 	Won			bool
 	Winner 		int16
+	War 		bool
 }
