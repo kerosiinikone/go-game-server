@@ -120,13 +120,41 @@ func (r *Player1Turn) acceptLoop() {
 				// Update state
 				// Notify player2
 
+				rc := r.r.RandomCard()
+				if rc.Suit == "" && rc.Value == "" {
+					// No cards left
+					// Game over, check for winner
+					var winner int16
+					
+					// Set state to game over
+					r.r.setState(&GameOver{
+						r: r.r,
+					})
+
+					go r.r.Start()
+
+					if len(r.r.Player1Cards) > len(r.r.Player2Cards) {
+						winner = r.r.Player1.Id
+					} else {
+						winner = r.r.Player2.Id
+					}
+					r.r.Player1.Inch <- ServerMsg{
+						Typ: MessageGameOver,
+						Winner: winner,
+					}
+					r.r.Player2.Inch <- ServerMsg{
+						Typ: MessageGameOver,
+						Winner: winner,
+					}
+					return
+				}
+
 				r.r.setState(&Player2Turn{
 					r: r.r,
 				})
 				
 				go r.r.Start()
 
-				rc := r.r.RandomCard()
 				r.r.Player1Drawn = append(r.r.Player1Drawn, rc)
 
 				r.r.Player1.Inch <- ServerMsg{
@@ -162,13 +190,41 @@ func (r *Player2Turn) acceptLoop() {
 			case MessagePlayer2Played:
 				// Update state
 				// Notify players
+				rc := r.r.RandomCard()
+				if rc.Suit == "" && rc.Value == "" {
+					// No cards left
+					// Game over, check for winner
+					var winner int16
+					
+					// Set state to game over
+					r.r.setState(&GameOver{
+						r: r.r,
+					})
+
+					go r.r.Start()
+
+					if len(r.r.Player1Cards) > len(r.r.Player2Cards) {
+						winner = r.r.Player1.Id
+					} else {
+						winner = r.r.Player2.Id
+					}
+					r.r.Player1.Inch <- ServerMsg{
+						Typ: MessageGameOver,
+						Winner: winner,
+					}
+					r.r.Player2.Inch <- ServerMsg{
+						Typ: MessageGameOver,
+						Winner: winner,
+					}
+					return
+				}
+
 				r.r.setState(&Player1Turn{
 					r: r.r,
 				})
 
 				go r.r.Start()
 
-				rc := r.r.RandomCard()
 				r.r.Player2Drawn = append(r.r.Player2Drawn, rc)
 
 				if len(r.r.Player1Drawn) == len(r.r.Player2Drawn) {
@@ -243,4 +299,10 @@ func (r *Player2Turn) acceptLoop() {
 
 func (r *Player2Turn) Name() string {
 	return "Player2Turn"
+}
+
+func (r *GameOver) acceptLoop() {}
+
+func (r *GameOver) Name() string {
+	return "GameOver"
 }

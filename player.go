@@ -107,7 +107,28 @@ func (p *Player) acceptLoop() {
 					log.Printf("Error unmarshalling message: %v\n", err)
 				}
 				p.conn.WriteMessage(websocket.TextMessage, bytes)
+			case MessageGameOver:
+				var (
+					bytes []byte
+				)
+				clientMsg := WSMsg{
+					Typ: MessageGameOver,
+					Winner: msg.Winner,
+				}
+				bytes, err := json.Marshal(&clientMsg)
+				if err != nil {
+					log.Printf("Error unmarshalling message: %v\n", err)
+				}
+				p.conn.WriteMessage(websocket.TextMessage, bytes)
+
+				p.close()
+				return
 			}
 		}
 	}
+}
+
+func (p *Player) close() {
+	log.Printf("Player %d disconnected\n", p.Id)
+	p.conn.Close()
 }

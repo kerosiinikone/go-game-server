@@ -10,6 +10,10 @@ type Player2Turn struct {
 	r *Room
 }
 
+type GameOver struct {
+	r *Room
+}
+
 type Card struct {
 	Suit  string
 	Value string
@@ -71,6 +75,9 @@ var deck = []Card{
 }
 
 func (r *Room) RandomCard() Card {
+	if len(r.Deck) == 0 {
+		return Card{}
+	}
 	randIndex := rand.Intn(len(r.Deck))
 	c := r.Deck[randIndex]
 	r.Deck = append(r.Deck[:randIndex], r.Deck[randIndex+1:]...)

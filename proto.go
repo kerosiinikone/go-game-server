@@ -12,6 +12,7 @@ const (
 	MessagePlayer2Turn
 	MessagePlayer1Played
 	MessagePlayer2Played
+	MessageGameOver
 )
 
 type ServerMsg struct {
@@ -20,6 +21,7 @@ type ServerMsg struct {
 	PlayerId 	int16
 	Card 		Card
 	Won			bool
+	Winner 		int16
 }
 
 type WSMsg struct {
@@ -27,4 +29,5 @@ type WSMsg struct {
 	PlayerId 	int16
 	Card 		Card
 	Won			bool
+	Winner 		int16
 }
