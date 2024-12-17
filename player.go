@@ -42,17 +42,9 @@ func (p *Player) listenForClient() {
 		// Also check for state of the room
 		switch msg.Typ {
 		case MessagePlayer1Played:
-			log.Printf("Player %d played\n", p.Id)
-			p.outch <- ServerMsg{
-				Typ: MessagePlayer1Played,
-				PlayerId: p.Id,
-			}
+			p.outch <- NewServerMsg(MessagePlayer1Played, p.rId, p.Id, msg.Card, msg.Won, 0, msg.War)
 		case MessagePlayer2Played:
-			log.Printf("Player %d played\n", p.Id)
-			p.outch <- ServerMsg{
-				Typ: MessagePlayer2Played,
-				PlayerId: p.Id,
-			}
+			p.outch <- NewServerMsg(MessagePlayer2Played, p.rId, p.Id, msg.Card, msg.Won, 0, msg.War)
 		}
 		// If the client disconnects, remove them from the room
 		// If the client sends a leave message, remove them from the room
@@ -69,60 +61,17 @@ func (p *Player) acceptLoop() {
 		case msg := <- p.Inch:
 			switch msg.Typ {
 			case MessagePlayerJoined:
-				clientMsg := WSMsg{
-					Typ: MessagePlayerJoined,
-					PlayerId: msg.PlayerId,
-				}
-				bytes, err := json.Marshal(&clientMsg)
-				if err != nil {
-					log.Printf("Error unmarshalling message: %v\n", err)
-				}
-				p.conn.WriteMessage(websocket.TextMessage, bytes)
+				clientMsg := NewWSMsg(msg)
+				SendToClient(p, &clientMsg)
 			case MessagePlayer1Turn:
-				var (
-					bytes []byte
-				)
-				clientMsg := WSMsg{
-					Typ: MessagePlayer1Turn,
-					PlayerId: p.Id,
-					Card: msg.Card,
-					War: msg.War,
-					Won: msg.Won,
-				}
-				bytes, err := json.Marshal(&clientMsg)
-				if err != nil {
-					log.Printf("Error unmarshalling message: %v\n", err)
-				}
-				p.conn.WriteMessage(websocket.TextMessage, bytes)
+				clientMsg := NewWSMsg(msg)
+				SendToClient(p, &clientMsg)
 			case MessagePlayer2Turn:
-				var (
-					bytes []byte
-				)
-				clientMsg := WSMsg{
-					Typ: MessagePlayer2Turn,
-					PlayerId: p.Id,
-					War: msg.War,
-					Card: msg.Card,
-				}
-				bytes, err := json.Marshal(&clientMsg)
-				if err != nil {
-					log.Printf("Error unmarshalling message: %v\n", err)
-				}
-				p.conn.WriteMessage(websocket.TextMessage, bytes)
+				clientMsg := NewWSMsg(msg)
+				SendToClient(p, &clientMsg)
 			case MessageGameOver:
-				var (
-					bytes []byte
-				)
-				clientMsg := WSMsg{
-					Typ: MessageGameOver,
-					Winner: msg.Winner,
-				}
-				bytes, err := json.Marshal(&clientMsg)
-				if err != nil {
-					log.Printf("Error unmarshalling message: %v\n", err)
-				}
-				p.conn.WriteMessage(websocket.TextMessage, bytes)
-
+				clientMsg := NewWSMsg(msg)
+				SendToClient(p, &clientMsg)
 				p.close()
 				return
 			}

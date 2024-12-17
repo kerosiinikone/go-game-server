@@ -33,3 +33,30 @@ type WSMsg struct {
 	Winner 		int16
 	War 		bool
 }
+
+func NewServerMsg(t int, r int16, p int16, c Card, w bool, wn int16, war bool) ServerMsg {
+	return ServerMsg{
+		Typ: t,
+		RoomId: r,
+		PlayerId: p,
+		Card: c,
+		Won: w,
+		Winner: wn,
+		War: war,
+	}
+}
+
+func NewWSMsg(s ServerMsg) WSMsg {
+	return WSMsg{
+		Typ: s.Typ,
+		PlayerId: s.PlayerId,
+		Card: s.Card,
+		Won: s.Won,
+		Winner: s.Winner,
+		War: s.War,
+	}
+}
+
+func SendToClient(p *Player, w *WSMsg) error {
+	return p.conn.WriteJSON(w)
+}

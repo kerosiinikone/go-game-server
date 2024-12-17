@@ -12,10 +12,6 @@ type RoomState interface {
 	Name() string
 }
 
-type RoomWaitingForPlayers struct {
-	r *Room 
-}
-
 type Room struct {
 	Id int16 
 	
@@ -44,8 +40,7 @@ func NewRoom(id int16, cfg *Config) *Room {
 		cfg: cfg,
 		Inch: make(chan ServerMsg),
 		mu: sync.Mutex{},
-		// Two decks of cards
-		Deck: append(deck, deck...),
+		Deck: append(deck, deck...), // Get this from the config
 	}
 	r.State = &RoomWaitingForPlayers{
 		r: r,
@@ -77,10 +72,7 @@ func (r *RoomWaitingForPlayers) acceptLoop() {
 
 				if r.r.Player1 != nil && msg.PlayerId == 2 {
 					log.Printf("Player 2 joined room %d\n", r.r.Id)
-					r.r.Player1.Inch <- ServerMsg{
-						Typ: MessagePlayerJoined,
-						PlayerId: msg.PlayerId,
-					}
+					r.r.Player1.Inch <- NewServerMsg(MessagePlayerJoined, r.r.Id, msg.PlayerId, Card{}, false, 0, false)
 				}
 
 				if r.r.Player1 != nil && r.r.Player2 != nil {
@@ -90,15 +82,13 @@ func (r *RoomWaitingForPlayers) acceptLoop() {
 
 					go r.r.Start()
 
-					r.r.Player1.Inch <- ServerMsg{
-						Typ: MessagePlayer1Turn,
-					}
-					r.r.Player2.Inch <- ServerMsg{
-						Typ: MessagePlayer1Turn,
-					}	
+					r.r.Player1.Inch <- NewServerMsg(MessagePlayer1Turn, r.r.Id, r.r.Player1.Id, Card{}, false, 0, false)
+					r.r.Player2.Inch <- NewServerMsg(MessagePlayer1Turn, r.r.Id, r.r.Player2.Id, Card{}, false, 0, false)
 
 					return
 				}
+			default:
+				panic("Illegal")
 			}
 		}
 	}
@@ -109,8 +99,7 @@ func (r *RoomWaitingForPlayers) Name() string {
 }
 
 // A few considerations:
-// A queue for all the incoming requests -> not needed since
-// only one player goes at a time with one input
+// A queue for all the incoming requests
 func (r *Player1Turn) acceptLoop() {
 	for {
 		select {
@@ -121,6 +110,7 @@ func (r *Player1Turn) acceptLoop() {
 				// Notify player2
 
 				rc := r.r.RandomCard()
+
 				if rc.Suit == "" && rc.Value == "" {
 					// No cards left
 					// Game over, check for winner
@@ -138,16 +128,14 @@ func (r *Player1Turn) acceptLoop() {
 					} else {
 						winner = r.r.Player2.Id
 					}
-					r.r.Player1.Inch <- ServerMsg{
-						Typ: MessageGameOver,
-						Winner: winner,
-					}
-					r.r.Player2.Inch <- ServerMsg{
-						Typ: MessageGameOver,
-						Winner: winner,
-					}
+
+					r.r.Player1.Inch <- NewServerMsg(MessageGameOver, r.r.Id, 0, Card{}, false, winner, false)
+					r.r.Player2.Inch <- NewServerMsg(MessageGameOver, r.r.Id, 0, Card{}, false, winner, false)
+
 					return
 				}
+
+				r.r.Player1Drawn = append(r.r.Player1Drawn, rc)
 
 				r.r.setState(&Player2Turn{
 					r: r.r,
@@ -155,23 +143,11 @@ func (r *Player1Turn) acceptLoop() {
 				
 				go r.r.Start()
 
-				r.r.Player1Drawn = append(r.r.Player1Drawn, rc)
+				r.r.Player1.Inch <- NewServerMsg(MessagePlayer2Turn, r.r.Id, r.r.Player1.Id, rc, false, 0, false)
+				r.r.Player2.Inch <- NewServerMsg(MessagePlayer2Turn, r.r.Id, r.r.Player2.Id, rc, false, 0, false)
 
-				r.r.Player1.Inch <- ServerMsg{
-					Typ: MessagePlayer2Turn,
-					Card: rc,
-				}
-				r.r.Player2.Inch <- ServerMsg{
-					Typ: MessagePlayer2Turn,
-					Card: rc,
-				}
 				return
-			case MessagePlayer2Played:
-				// Put on a queue?
-				// or illegal
-			case MessagePlayer2Turn:
-				// Illegal
-			case MessagePlayerJoined:
+			default:
 				panic("Illegal")
 			}
 		}
@@ -191,6 +167,7 @@ func (r *Player2Turn) acceptLoop() {
 				// Update state
 				// Notify players
 				rc := r.r.RandomCard()
+
 				if rc.Suit == "" && rc.Value == "" {
 					// No cards left
 					// Game over, check for winner
@@ -208,14 +185,10 @@ func (r *Player2Turn) acceptLoop() {
 					} else {
 						winner = r.r.Player2.Id
 					}
-					r.r.Player1.Inch <- ServerMsg{
-						Typ: MessageGameOver,
-						Winner: winner,
-					}
-					r.r.Player2.Inch <- ServerMsg{
-						Typ: MessageGameOver,
-						Winner: winner,
-					}
+
+					r.r.Player1.Inch <- NewServerMsg(MessageGameOver, r.r.Id, 0, Card{}, false, winner, false)
+					r.r.Player2.Inch <- NewServerMsg(MessageGameOver, r.r.Id, 0, Card{}, false, winner, false)
+
 					return
 				}
 
@@ -241,30 +214,17 @@ func (r *Player2Turn) acceptLoop() {
 						won := []Card{player1Card, player2Card}
 						r.r.Player1Cards = append(r.r.Player1Cards, won...)
 
-						r.r.Player1.Inch <- ServerMsg{
-							Typ: MessagePlayer1Turn,
-							Won: true,
-							Card: rc,
-						}
-						r.r.Player2.Inch <- ServerMsg{
-							Typ: MessagePlayer1Turn,
-							Card: rc,
-						}	
+						r.r.Player1.Inch <- NewServerMsg(MessagePlayer1Turn, r.r.Id, r.r.Player1.Id, rc, true, 0, false)
+						r.r.Player2.Inch <- NewServerMsg(MessagePlayer1Turn, r.r.Id, r.r.Player2.Id, rc, false, 0, false)
 
 					} else if p1Score < p2Score {
 						// Player 2 wins
 						won := []Card{player1Card, player2Card}
 						r.r.Player2Cards = append(r.r.Player2Cards, won...)
 
-						r.r.Player1.Inch <- ServerMsg{
-							Typ: MessagePlayer1Turn,
-							Card: rc,
-						}
-						r.r.Player2.Inch <- ServerMsg{
-							Typ: MessagePlayer1Turn,
-							Won: true,
-							Card: rc,
-						}	
+						r.r.Player1.Inch <- NewServerMsg(MessagePlayer1Turn, r.r.Id, r.r.Player1.Id, rc, false, 0, false)
+						r.r.Player2.Inch <- NewServerMsg(MessagePlayer1Turn, r.r.Id, r.r.Player2.Id, rc, true, 0, false)
+
 					} else {
 						// Draw -> this is where the war occurs
 						r.r.setState(&WarPlayer1Turn{
@@ -273,16 +233,8 @@ func (r *Player2Turn) acceptLoop() {
 
 						go r.r.Start()
 
-						r.r.Player1.Inch <- ServerMsg{
-							Typ: MessagePlayer1Turn,
-							War: true,
-							Card: rc,
-						}
-						r.r.Player2.Inch <- ServerMsg{
-							Typ: MessagePlayer1Turn,
-							War: true,
-							Card: rc,
-						}	
+						r.r.Player1.Inch <- NewServerMsg(MessagePlayer1Turn, r.r.Id, r.r.Player1.Id, rc, false, 0, true)
+						r.r.Player2.Inch <- NewServerMsg(MessagePlayer1Turn, r.r.Id, r.r.Player2.Id, rc, false, 0, true)
 
 						return
 					}
@@ -322,7 +274,6 @@ func (r *WarPlayer1Turn) acceptLoop() {
 				// Notify player2
 
 				rc1 := r.r.RandomCard()
-				// Face down card
 				rc2 := r.r.RandomCard()
 
 				if (rc1.Suit == "" && rc1.Value == "") || (rc2.Suit == "" && rc2.Value == "") {
@@ -342,14 +293,10 @@ func (r *WarPlayer1Turn) acceptLoop() {
 						} else {
 							winner = r.r.Player2.Id
 						}
-						r.r.Player1.Inch <- ServerMsg{
-							Typ: MessageGameOver,
-							Winner: winner,
-						}
-						r.r.Player2.Inch <- ServerMsg{
-							Typ: MessageGameOver,
-							Winner: winner,
-						}
+
+						r.r.Player1.Inch <- NewServerMsg(MessageGameOver, r.r.Id, 0, Card{}, false, winner, false)
+						r.r.Player2.Inch <- NewServerMsg(MessageGameOver, r.r.Id, 0, Card{}, false, winner, false)
+
 						return
 					}
 				
@@ -362,16 +309,9 @@ func (r *WarPlayer1Turn) acceptLoop() {
 				r.r.Player1Drawn = append(r.r.Player1Drawn, rc1)
 				r.r.Player1Drawn = append(r.r.Player1Drawn, rc2)
 
-				r.r.Player1.Inch <- ServerMsg{
-					Typ: MessagePlayer2Turn,
-					War: true,
-					Card: rc2,
-				}
-				r.r.Player2.Inch <- ServerMsg{
-					Typ: MessagePlayer2Turn,
-					War: true,
-					Card: rc2,
-				}
+				r.r.Player1.Inch <- NewServerMsg(MessagePlayer2Turn, r.r.Id, r.r.Player1.Id, rc2, false, 0, true)
+				r.r.Player2.Inch <- NewServerMsg(MessagePlayer2Turn, r.r.Id, r.r.Player2.Id, rc2, false, 0, true)
+				
 				return
 			default:
 				panic("Illegal")
@@ -393,7 +333,6 @@ func (r *WarPlayer2Turn) acceptLoop() {
 				// Update state
 				// Notify players
 
-				// Face down card
 				rc1 := r.r.RandomCard()
 				rc2 := r.r.RandomCard()
 
@@ -414,14 +353,10 @@ func (r *WarPlayer2Turn) acceptLoop() {
 					} else {
 						winner = r.r.Player2.Id
 					}
-					r.r.Player1.Inch <- ServerMsg{
-						Typ: MessageGameOver,
-						Winner: winner,
-					}
-					r.r.Player2.Inch <- ServerMsg{
-						Typ: MessageGameOver,
-						Winner: winner,
-					}
+
+					r.r.Player1.Inch <- NewServerMsg(MessageGameOver, r.r.Id, 0, Card{}, false, winner, false)
+					r.r.Player2.Inch <- NewServerMsg(MessageGameOver, r.r.Id, 0, Card{}, false, winner, false)
+
 					return
 				}
 
@@ -448,30 +383,17 @@ func (r *WarPlayer2Turn) acceptLoop() {
 						won := []Card{player1Card, player2Card}
 						r.r.Player1Cards = append(r.r.Player1Cards, won...)
 
-						r.r.Player1.Inch <- ServerMsg{
-							Typ: MessagePlayer1Turn,
-							Won: true,
-							Card: rc2,
-						}
-						r.r.Player2.Inch <- ServerMsg{
-							Typ: MessagePlayer1Turn,
-							Card: rc2,
-						}	
+						r.r.Player1.Inch <- NewServerMsg(MessagePlayer1Turn, r.r.Id, r.r.Player1.Id, rc2, true, 0, false)
+						r.r.Player2.Inch <- NewServerMsg(MessagePlayer1Turn, r.r.Id, r.r.Player2.Id, rc2, false, 0, false)
 
 					} else if p1Score < p2Score {
 						// Player 2 wins
 						won := []Card{player1Card, player2Card}
 						r.r.Player2Cards = append(r.r.Player2Cards, won...)
 
-						r.r.Player1.Inch <- ServerMsg{
-							Typ: MessagePlayer1Turn,
-							Card: rc2,
-						}
-						r.r.Player2.Inch <- ServerMsg{
-							Typ: MessagePlayer1Turn,
-							Won: true,
-							Card: rc2,
-						}	
+						r.r.Player1.Inch <- NewServerMsg(MessagePlayer1Turn, r.r.Id, r.r.Player1.Id, rc2, false, 0, false)
+						r.r.Player2.Inch <- NewServerMsg(MessagePlayer1Turn, r.r.Id, r.r.Player2.Id, rc2, true, 0, false)
+
 					} else {
 						// Draw -> this is where the war occurs
 						r.r.setState(&WarPlayer1Turn{
@@ -480,16 +402,8 @@ func (r *WarPlayer2Turn) acceptLoop() {
 
 						go r.r.Start()
 
-						r.r.Player1.Inch <- ServerMsg{
-							Typ: MessagePlayer1Turn,
-							War: true,
-							Card: rc2,
-						}
-						r.r.Player2.Inch <- ServerMsg{
-							Typ: MessagePlayer1Turn,
-							War: true,
-							Card: rc2,
-						}	
+						r.r.Player1.Inch <- NewServerMsg(MessagePlayer1Turn, r.r.Id, r.r.Player1.Id, rc2, false, 0, true)
+						r.r.Player2.Inch <- NewServerMsg(MessagePlayer1Turn, r.r.Id, r.r.Player2.Id, rc2, false, 0, true)
 
 						return
 					}

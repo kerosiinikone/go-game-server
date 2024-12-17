@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
@@ -58,17 +57,16 @@ func (rh *RoomHandler) ServeWebSocket(w http.ResponseWriter, r *http.Request) {
 	rh.resolveRoomConnection(newPlayer)
 
 	// Send a handshake message to the client
-	bytes, err := json.Marshal(&WSMsg{
+	msg := NewWSMsg(ServerMsg{
 		Typ: MessageHandshake,
 		PlayerId: newPlayer.Id,
 	})
-	if err != nil {
-		log.Printf("Error unmarshalling message: %v\n", err)
+	if err := SendToClient(newPlayer, &msg); err != nil {
+		log.Printf("Error sending message to client: %v\n", err)
 	}
-	newPlayer.conn.WriteMessage(websocket.TextMessage, bytes)
 }
 
-// Destroying unused rooms
+// Destroying unused rooms -> set a timeout context when players leave?
 func (rh *RoomHandler) acceptLoop() {
 	for {
 		select {
@@ -83,7 +81,9 @@ func (rh *RoomHandler) acceptLoop() {
 }
 
 func (rh *RoomHandler) resolveRoomConnection(p *Player) {
-	// Lock resource?
+	rh.mu.Lock()
+	defer rh.mu.Unlock()
+
 	for _, v := range rh.rooms {
 		if v.Player1 == nil {
 			v.Player1 = p
@@ -110,26 +110,22 @@ func (rh *RoomHandler) resolveRoomConnection(p *Player) {
 		}
 	}
 
-	// Simplify
 	newId := rh.latestRoomId+1
 	sId := fmt.Sprintf("%d", newId)
 
 	rh.rooms[sId] = NewRoom(newId, rh.cfg)
 	r := rh.rooms[sId]
 
-	r.Player1 = p
 	p.outch = r.Inch
 	p.Id = 1
 	p.Player1 = true
 	p.rId = r.Id
+	r.Player1 = p
 	rh.latestRoomId = newId
 	
 	go r.Start()
 	
-	r.Inch <- ServerMsg{
-		Typ: MessagePlayerJoined,
-		PlayerId: p.Id,
-	}
+	r.Inch <- NewServerMsg(MessagePlayerJoined, r.Id, p.Id, Card{}, false, 0, false)
 
 }
 
@@ -137,8 +133,9 @@ func main() {
 	var (
 		addr = flag.String("addr", ":3000", "game server address")
 	)
+
 	flag.Parse()
-	cfg := NewConfig(*addr)
+	cfg := NewConfig(*addr) // Will be passed to the player through handshake
 
 	rh := &RoomHandler{
 		rooms: make(RoomCollection),

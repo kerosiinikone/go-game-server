@@ -1,3 +1,3 @@
 A mystery turn-based game
 
-- A state for winning condition -> shift back to the next one?
+- If both players leave, set a timeout to destroy the room in the RoomHandler
