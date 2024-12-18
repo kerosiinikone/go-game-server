@@ -52,6 +52,8 @@ func (p *Player) listenForClient() {
 	}
 }
 
+// ERRORS
+
 // Handle player and room communication on the server
 // For example -> room notifies the player1 that it is their turn 
 // Receive the channel comm here and pass it onto the client
@@ -62,16 +64,16 @@ func (p *Player) acceptLoop() {
 			switch msg.Typ {
 			case MessagePlayerJoined:
 				clientMsg := NewWSMsg(msg)
-				SendToClient(p, &clientMsg)
+				SendToClient(p, clientMsg)
 			case MessagePlayer1Turn:
 				clientMsg := NewWSMsg(msg)
-				SendToClient(p, &clientMsg)
+				SendToClient(p, clientMsg)
 			case MessagePlayer2Turn:
 				clientMsg := NewWSMsg(msg)
-				SendToClient(p, &clientMsg)
+				SendToClient(p, clientMsg)
 			case MessageGameOver:
 				clientMsg := NewWSMsg(msg)
-				SendToClient(p, &clientMsg)
+				SendToClient(p, clientMsg)
 				p.close()
 				return
 			}

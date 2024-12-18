@@ -61,7 +61,7 @@ func (rh *RoomHandler) ServeWebSocket(w http.ResponseWriter, r *http.Request) {
 		Typ: MessageHandshake,
 		PlayerId: newPlayer.Id,
 	})
-	if err := SendToClient(newPlayer, &msg); err != nil {
+	if err := SendToClient(newPlayer, msg); err != nil {
 		log.Printf("Error sending message to client: %v\n", err)
 	}
 }

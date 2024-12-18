@@ -29,8 +29,8 @@ type GameOver struct {
 }
 
 type Card struct {
-	Suit  string
-	Value string
+	Suit  string `json:",omitempty"`
+	Value string `json:",omitempty"`
 }
 
 var deck = []Card{

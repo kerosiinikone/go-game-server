@@ -1,5 +1,12 @@
 package main
 
+import (
+	"encoding/json"
+	"log"
+
+	"github.com/gorilla/websocket"
+)
+
 // Message types
 
 const (
@@ -28,7 +35,7 @@ type ServerMsg struct {
 type WSMsg struct {
 	Typ 		int
 	PlayerId 	int16
-	Card 		Card
+	Card 		Card `json:",omitempty"`
 	Won			bool
 	Winner 		int16
 	War 		bool
@@ -46,17 +53,25 @@ func NewServerMsg(t int, r int16, p int16, c Card, w bool, wn int16, war bool) S
 	}
 }
 
-func NewWSMsg(s ServerMsg) WSMsg {
-	return WSMsg{
+func NewWSMsg(s ServerMsg) *WSMsg {
+	msg := &WSMsg{
 		Typ: s.Typ,
 		PlayerId: s.PlayerId,
-		Card: s.Card,
 		Won: s.Won,
 		Winner: s.Winner,
 		War: s.War,
 	}
+	if s.Card.Suit != "" {
+        msg.Card = s.Card
+    } 
+	return msg
 }
 
 func SendToClient(p *Player, w *WSMsg) error {
-	return p.conn.WriteJSON(w)
+	msg, err := json.Marshal(w)
+	if err != nil {
+		return err
+	}
+	log.Printf("Sending message to client: %v\n", string(msg))
+	return p.conn.WriteMessage(websocket.TextMessage, msg)
 }
