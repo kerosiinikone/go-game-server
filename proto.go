@@ -20,6 +20,7 @@ const (
 	MessagePlayer1Played
 	MessagePlayer2Played
 	MessageGameOver
+	MessagePlayerLeft
 )
 
 type ServerMsg struct {

@@ -30,6 +30,11 @@ func NewPlayer(conn *websocket.Conn) *Player {
 
 // Two types of messages from client -> turnCmd and leaveCmd 
 func (p *Player) listenForClient() {
+	defer func ()  {
+		log.Printf("Player %d left\n", p.Id)
+		p.outch <- NewServerMsg(MessagePlayerLeft, p.rId, p.Id, Card{}, false, 0, false)
+		p.conn.Close()	
+	}()
 	for {
 		var msg WSMsg
 		_, bytes, err := p.conn.ReadMessage()

@@ -1,10 +1,12 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"strconv"
 	"sync"
+	"time"
 )
 
 type RoomState interface {
@@ -13,7 +15,7 @@ type RoomState interface {
 }
 
 type Room struct {
-	Id int16 
+	Id int16
 	
 	// Room state
 	State RoomState
@@ -29,17 +31,21 @@ type Room struct {
 	Player2 *Player
 	
 	Inch chan ServerMsg
+	RhCh chan ServerMsg
 	
 	cfg *Config
 	mu sync.Mutex
+	ctx context.Context
 }
 
-func NewRoom(id int16, cfg *Config) *Room {
+func NewRoom(id int16, cfg *Config, roomHandlerCh chan ServerMsg) *Room {
 	r := &Room{
 		Id: id,
 		cfg: cfg,
 		Inch: make(chan ServerMsg),
 		mu: sync.Mutex{},
+		ctx: context.Background(),
+		RhCh: roomHandlerCh,
 		Deck: append(deck, deck...), // Get this from the config
 	}
 	r.State = &RoomWaitingForPlayers{
@@ -70,6 +76,11 @@ func (r *RoomWaitingForPlayers) acceptLoop() {
 			case MessagePlayerJoined:
 				fmt.Printf("New player %d joined to %d\n", msg.PlayerId, r.r.Id)
 
+				// Reset context
+				if _, ok := r.r.ctx.Deadline(); ok {
+					r.r.ctx = context.Background()
+				}
+
 				if r.r.Player1 != nil && msg.PlayerId == 2 {
 					log.Printf("Player 2 joined room %d\n", r.r.Id)
 					r.r.Player1.Inch <- NewServerMsg(MessagePlayerJoined, r.r.Id, msg.PlayerId, Card{}, false, 0, false)
@@ -87,9 +98,30 @@ func (r *RoomWaitingForPlayers) acceptLoop() {
 
 					return
 				}
+				case MessagePlayerLeft:
+					var cancel context.CancelFunc
+
+					log.Printf("Player %d left room %d\n", msg.PlayerId, r.r.Id)
+
+					if msg.PlayerId == 1 {
+						r.r.Player1 = nil
+						log.Printf("Player 1 left room %d\n", r.r.Id)
+					} else {
+						r.r.Player2 = nil
+						log.Printf("Player 2 left room %d\n", r.r.Id)
+					}
+
+					if r.r.Player1 == nil && r.r.Player2 == nil {
+						// Destroy for now instead of reverting back to RoomWaitingForPlayers
+						r.r.ctx, cancel = context.WithTimeout(context.Background(), time.Duration(r.r.cfg.RoomTimeout) * time.Second)
+						defer cancel()
+					}
 			default:
 				panic("Illegal")
 			}
+			case <- r.r.ctx.Done():
+				r.r.RhCh <- NewServerMsg(MessageRoomDestroyed, r.r.Id, 0, Card{}, false, 0, false)
+				return
 		}
 	}
 }
@@ -147,9 +179,28 @@ func (r *Player1Turn) acceptLoop() {
 				r.r.Player2.Inch <- NewServerMsg(MessagePlayer2Turn, r.r.Id, r.r.Player2.Id, rc, false, 0, false)
 
 				return
-			default:
-				panic("Illegal")
-			}
+			case MessagePlayerLeft:
+				var cancel context.CancelFunc
+
+				if msg.PlayerId == 1 {
+					r.r.Player1 = nil
+					log.Printf("Player 1 left room %d\n", r.r.Id)
+				} else {
+					r.r.Player2 = nil
+					log.Printf("Player 2 left room %d\n", r.r.Id)
+				}
+
+				if r.r.Player1 == nil && r.r.Player2 == nil {
+					log.Printf("Both players left room %d\n", r.r.Id)
+					r.r.ctx, cancel = context.WithTimeout(context.Background(), time.Duration(r.r.cfg.RoomTimeout) * time.Second)
+					defer cancel()
+				}
+		default:
+			panic("Illegal")
+		}
+		case <- r.r.ctx.Done():
+			r.r.RhCh <- NewServerMsg(MessageRoomDestroyed, r.r.Id, 0, Card{}, false, 0, false)
+			return
 		}
 	}
 }
@@ -247,9 +298,27 @@ func (r *Player2Turn) acceptLoop() {
 				go r.r.Start()
 
 				return
-			default:
-				panic("Illegal")
-			}
+			case MessagePlayerLeft:
+				var cancel context.CancelFunc
+
+				if msg.PlayerId == 1 {
+					r.r.Player1 = nil
+					log.Printf("Player 1 left room %d\n", r.r.Id)
+				} else {
+					r.r.Player2 = nil
+					log.Printf("Player 2 left room %d\n", r.r.Id)
+				}
+
+				if r.r.Player1 == nil && r.r.Player2 == nil {
+					r.r.ctx, cancel = context.WithTimeout(context.Background(), time.Duration(r.r.cfg.RoomTimeout) * time.Second)
+					defer cancel()
+				}
+		default:
+			panic("Illegal")
+		}
+		case <- r.r.ctx.Done():
+			r.r.RhCh <- NewServerMsg(MessageRoomDestroyed, r.r.Id, 0, Card{}, false, 0, false)
+			return
 		}
 	}
 }
@@ -313,9 +382,27 @@ func (r *WarPlayer1Turn) acceptLoop() {
 				r.r.Player2.Inch <- NewServerMsg(MessagePlayer2Turn, r.r.Id, r.r.Player2.Id, rc2, false, 0, true)
 				
 				return
-			default:
-				panic("Illegal")
-			}
+			case MessagePlayerLeft:
+				var cancel context.CancelFunc
+
+				if msg.PlayerId == 1 {
+					r.r.Player1 = nil
+					log.Printf("Player 1 left room %d\n", r.r.Id)
+				} else {
+					r.r.Player2 = nil
+					log.Printf("Player 2 left room %d\n", r.r.Id)
+				}
+
+				if r.r.Player1 == nil && r.r.Player2 == nil {
+					r.r.ctx, cancel = context.WithTimeout(context.Background(), time.Duration(r.r.cfg.RoomTimeout) * time.Second)
+					defer cancel()
+				}
+		default:
+			panic("Illegal")
+		}
+		case <- r.r.ctx.Done():
+			r.r.RhCh <- NewServerMsg(MessageRoomDestroyed, r.r.Id, 0, Card{}, false, 0, false)
+			return
 		}
 	}
 }
@@ -416,9 +503,27 @@ func (r *WarPlayer2Turn) acceptLoop() {
 				go r.r.Start()
 
 				return
-			default:
-				panic("Illegal")
-			}
+			case MessagePlayerLeft:
+				var cancel context.CancelFunc
+
+				if msg.PlayerId == 1 {
+					r.r.Player1 = nil
+					log.Printf("Player 1 left room %d\n", r.r.Id)
+				} else {
+					r.r.Player2 = nil
+					log.Printf("Player 2 left room %d\n", r.r.Id)
+				}
+
+				if r.r.Player1 == nil && r.r.Player2 == nil {
+					r.r.ctx, cancel = context.WithTimeout(context.Background(), time.Duration(r.r.cfg.RoomTimeout) * time.Second)
+					defer cancel()
+				}
+		default:
+			panic("Illegal")
+		}
+		case <- r.r.ctx.Done():
+			r.r.RhCh <- NewServerMsg(MessageRoomDestroyed, r.r.Id, 0, Card{}, false, 0, false)
+			return
 		}
 	}
 }

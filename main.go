@@ -73,7 +73,7 @@ func (rh *RoomHandler) acceptLoop() {
 		case msg := <-rh.Inch:
 			switch msg.Typ {
 			case MessageRoomDestroyed:
-				// Cleanup
+				log.Printf("Room %d destroyed\n", msg.RoomId)
 				delete(rh.rooms, fmt.Sprintf("%d", msg.RoomId))
 			}
 		}
@@ -85,7 +85,7 @@ func (rh *RoomHandler) resolveRoomConnection(p *Player) {
 	defer rh.mu.Unlock()
 
 	for _, v := range rh.rooms {
-		if v.Player1 == nil {
+		if v.Player1 == nil && v.State.Name() == "RoomWaitingForPlayers" {
 			v.Player1 = p
 			p.Id = 1
 			p.outch = v.Inch
@@ -97,7 +97,7 @@ func (rh *RoomHandler) resolveRoomConnection(p *Player) {
 			}
 			return
 		}
-		if v.Player2 == nil {
+		if v.Player2 == nil && v.State.Name() == "RoomWaitingForPlayers" {
 			v.Player2 = p
 			p.Id = 2
 			p.outch = v.Inch
@@ -113,7 +113,7 @@ func (rh *RoomHandler) resolveRoomConnection(p *Player) {
 	newId := rh.latestRoomId+1
 	sId := fmt.Sprintf("%d", newId)
 
-	rh.rooms[sId] = NewRoom(newId, rh.cfg)
+	rh.rooms[sId] = NewRoom(newId, rh.cfg, rh.Inch)
 	r := rh.rooms[sId]
 
 	p.outch = r.Inch
@@ -142,6 +142,7 @@ func main() {
 		Inch: make(chan ServerMsg),
 		cfg: cfg,
 	}
+	go rh.acceptLoop()
 
 	http.HandleFunc("/", rh.ServeWebSocket)
 	http.ListenAndServe(cfg.Addr, nil)
