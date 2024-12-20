@@ -100,9 +100,6 @@ func (r *RoomWaitingForPlayers) acceptLoop() {
 				}
 				case MessagePlayerLeft:
 					var cancel context.CancelFunc
-
-					log.Printf("Player %d left room %d\n", msg.PlayerId, r.r.Id)
-
 					if msg.PlayerId == 1 {
 						r.r.Player1 = nil
 						log.Printf("Player 1 left room %d\n", r.r.Id)
