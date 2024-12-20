@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"sync"
 
 	"github.com/gorilla/websocket"
+	dotenv "github.com/joho/godotenv"
 )
 
 // Initiate the websocket server
@@ -30,7 +32,6 @@ type RoomHandler struct {
 const (
 	defaultReadBufferSize = 1024
 	defaultWriteBufferSize = 1024
-	defaultClientAddr = "http://localhost:5173"
 )
 
 var upgrader = websocket.Upgrader{
@@ -38,8 +39,13 @@ var upgrader = websocket.Upgrader{
     WriteBufferSize: defaultWriteBufferSize,
 	CheckOrigin: func(r *http.Request) bool {
 		origin := r.Header.Get("Origin")
-		return origin == defaultClientAddr
+		return origin == os.Getenv("CLIENT")
 	},
+}
+
+func init() {
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
+	dotenv.Load()
 }
 
 // Wrap for errors?
