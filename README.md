@@ -1,3 +1,2 @@
-A mystery turn-based game
-
-- If both players leave, set a timeout to destroy the room in the RoomHandler
+# Multiplayer game server for 3D card game
+### I tried implementing a state machine
